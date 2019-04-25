@@ -1,7 +1,7 @@
 import numpy as np
 import math
 
-n = 10**3
+n = 10**6
 N = 10**3
 
 # Constant for h(i):
@@ -9,14 +9,11 @@ k2 = 5912.1281
 
 # Rejection sampling so we can generate samples with distribution h(i):
 def rejection_sampling():
-	# Generates uniform:
-	y = np.random.uniform()
-	# Calculates envolope (using y=7*x*(x+1)/(2*k1)), i.e. use y=7x as envelope
-	k1 = 3503500
-	x = math.ceil(0.5*(-1 + math.sqrt(4004000*y+1)))
+	# Calculates envolope (using y=x*(x+1)/(2*k1)), i.e. use y=x as envelope
+	c = 1.2
+	x = math.ceil(np.random.uniform(0,N))
 	# Accepts with given probability:
-	prob = y - math.log(x)/k2
-	print(prob,x)
+	prob = (math.log(x)/k2)/(c/N)
 	if (np.random.binomial(1,prob) == 1):
 		return x
 	else:
@@ -31,6 +28,7 @@ for i in range(n):
 	value = x*math.log(x)/(math.log(x)/k2)
 	accumulator += value
 
-answer = (accumulator/n)*N
+answer = (accumulator/n)
 
 print("Final result: " + str(answer))
+print("Relative error: " + str((answer-3207332)/3207332))
