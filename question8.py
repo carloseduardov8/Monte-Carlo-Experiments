@@ -7,18 +7,6 @@ N = 10**3
 # Constant for h(i):
 k2 = 5912.1281
 
-# Rejection sampling so we can generate samples with distribution h(i):
-def rejection_sampling():
-	# Uses c.g(x) (where g(x) is uniform) as envelope function:
-	c = 1.2
-	x = math.ceil(np.random.uniform(0,N))
-	# Accepts with given probability:
-	prob = (math.log(x)/k2)/(c/N)
-	if (np.random.binomial(1,prob) == 1):
-		return x
-	else:
-		return rejection_sampling()
-
 accumulator = 0
 
 # Monte Carlo:
