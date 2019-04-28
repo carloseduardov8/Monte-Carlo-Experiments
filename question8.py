@@ -1,22 +1,53 @@
-import numpy as np
+import numpy
 import math
+import scipy.stats
 
+tail = 5
 n = 10**6
-N = 10**3
 
-# Constant for h(i):
-k2 = 5912.1281
+# Pdf of bernoulli random variable:
+def g(x):
+	if (x >= tail):
+		return 1
+	else:
+		return 0
 
+# Pdf of normal distribution:
+def f(x):
+	return scipy.stats.norm(0, 1).pdf(x)
+
+# Pdf of exponential:
+def h(x):
+	return math.exp(-x)
+
+# Sample from exponential:
+def sample_h():
+	return numpy.random.exponential(scale=1)
+
+# Sample from normal distribution:
+def sample_f():
+	return numpy.random.normal(0, 1)
+
+# MAIN PROGRAM
+
+# Naive Sampling:
 accumulator = 0
-
-# Monte Carlo:
 for i in range(n):
-	x = rejection_sampling()
-	# Calculates g(x)/h(x):
-	value = x*math.log(x)/(math.log(x)/k2)
-	accumulator += value
+	x = sample_f()
+	naive = g(x)
+	accumulator += naive
 
-answer = (accumulator/n)
+result = accumulator*1.0/n
+print("MC Naive Sampling: " + str(result))
 
-print("Final result: " + str(answer))
-print("Relative error: " + str((answer-3207332)/3207332))
+
+# Importance Sampling:
+accumulator = 0
+for i in range(n):
+	x = sample_h()
+	imp = g(x)*f(x)/h(x)
+	accumulator += imp
+
+result = accumulator*1.0/n
+print("MC Importance Sampling: " + str(result))
+print("Correct value: " + str(1-scipy.stats.norm.cdf(tail)))
