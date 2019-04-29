@@ -2,20 +2,21 @@ import numpy
 import math
 
 # Numero de elementos:
-n = 10
+n = 100
 # Vetor com todos os n elementos distintos:
-total = list(range(20))
+total = list(range(n))
 # Tamanho de cada subconjunto amostrado:
 k = 4
 
 # Gera subconjuntos de tamanho k com probabiliade 1/|S_k,n|:
 for i in range(k):
-	# Gera uma uniforme discreta podendo valer {0,1,...,n-1}:
-	j = math.floor(numpy.random.uniform(0,n))
-	# Guarda o elemento gerado:
-	temp = total[j]
+	# Gera uma uniforme discreta podendo valer {i, i+1, ..., n-1}:
+	j = math.floor(numpy.random.uniform(i,n))
 	# Permuta no array:
-	total[j] = total[n-j-1]
-	total[n-j-1] = temp
+	temp = total[j]
+	total[j] = total[i]
+	# Fixa o elemento no inicio do array:
+	total[i] = temp
 
-print(total[:k])
+# Printa o resultado:
+print("Sample:", total[:k])
