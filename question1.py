@@ -2,7 +2,7 @@ import numpy as np
 import math
 
 # Numero de experimentos
-n = 10**7
+n = 10**6
 
 # Parabola:
 def f(x):
@@ -24,4 +24,4 @@ for i in range(n):
 	accumulator += sample_g()
 
 result = 3.0*accumulator/n
-print(result, math.sqrt(2))
+print(n, abs(result-math.sqrt(2))/math.sqrt(2))
