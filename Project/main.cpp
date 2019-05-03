@@ -17,20 +17,32 @@ using namespace std;
 typedef pair<int,int> node;								// Renames coordinate pair for convenience
 // GLOBAL VARIABLES
 unordered_map<string,bool> grid; 						// Grid structure global variable
+vector<node> path;										// Path being formed
 mt19937 gen;											// Mersenne Twister generator
 uniform_real_distribution<double> uDis; 				// Uniform distribution
 // FUNCTIONS
 void walkTo(node a);									// Performs all operations to move the system to a node
+node backtrack();										// Walks backwards 1 node
 bool visited(node a);									// Returns true if node was already visited in the grid
 void availableNodes(node a, vector<node>* available);	// Returns a number from 0 to 4 representing how many nodes the path may go to
-int decideDestination(vector<node>* available);		// Returns the next node where the path should go to
+node decideDestination(vector<node>* available);		// Returns the next node where the path should go to
 void initGenerator();									// Initiailzes the RNG
 double sampleUnif();									// Returns a real number from 0 to 1
 
+// Helper function to print pairs:
+template <typename T, typename S>
+ostream& operator<<(ostream& os, const pair<T, S>& v)
+{
+    os << "(";
+    os << v.first << ", "
+       << v.second << ")";
+    return os;
+}
 
-////////////////////
-/// MAIN PROGRAM ///
-////////////////////
+
+////////////////////	////////////////////	////////////////////
+/// MAIN PROGRAM ///	/// MAIN PROGRAM ///	/// MAIN PROGRAM ///
+////////////////////	////////////////////	////////////////////
 
 int main(){
 
@@ -41,24 +53,23 @@ int main(){
 	node current = node(0,0);
 	walkTo(current);
 
-	vector<int> statTest(4,0);
-	int n = 10000000;
-	for (int i = 0; i<n; i++){
+	for (int i=0; i<1000; i++){
 		// Retrieves available nodes:
-		vector<node> available;
-		availableNodes(current, &available);
-		// Calculates probabilities:
-		double unif = sampleUnif();
-		double prob = 1.0/available.size();
-		// Decides where to go:
-		int index = decideDestination(&available);
-		statTest[index-1] += 1;
+		vector<node>* available = new vector<node>;
+		availableNodes(current, available);
+		// Checks if any node is available:
+		if (available->size() != 0){
+			// Decides where to go:
+			current = decideDestination(available);
+			walkTo(current);
+			delete available;
+			cout << current << endl;
+		// If no nodes are available:
+		} else {
+			// Undo time by 1 iteration:
+			 current = backtrack();
+		}
 	}
-
-	for (int i=0; i<4; i++){
-		cout << i+1 << ": " << statTest[i]*1.0/n << endl;
-	}
-
 
 }
 
@@ -72,6 +83,17 @@ int main(){
 void walkTo(node a){
 	// Inserts node into hash table:
 	grid.insert(make_pair(ptos(a),true));
+	// Inserts node into path:
+	path.push_back(a);
+}
+
+node backtrack(){
+	// Removes node from hash table:
+	grid.erase(ptos(path.back()));
+	// Removes last node from path:
+	path.pop_back();
+	// Returns previous node (new current position):
+	return path.back();
 }
 
 // Returns true if node was already visited in the grid:
@@ -101,7 +123,7 @@ void availableNodes(node a, vector<node>* available){
 }
 
 // Returns the next node where the path should go to:
-int decideDestination(vector<node>* available){
+node decideDestination(vector<node>* available){
 	// Calculates probabilities:
 	double unif = sampleUnif();
 	double prob = 1.0/available->size();
@@ -110,8 +132,7 @@ int decideDestination(vector<node>* available){
 		// Checks if node was selected:
 		if (unif <= prob*i){
 			// Elects the node:
-			//return available->at(i-1);
-			return i;
+			return available->at(i-1);
 		}
 	}
 	// If loop finished, prints out an error:
