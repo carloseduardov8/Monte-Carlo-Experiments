@@ -10,16 +10,18 @@ using namespace std;
 /// GLOBAL DECLARATIONS ///
 ///////////////////////////
 
-// Grid structure global variable:
-unordered_map<string,bool> grid;
-// Renames coordinate pair for convenience:
-typedef pair<int,int> node;
-// Converts a pair to a string:
-string ptos(pair<int,int> a);
-// Performs all operations to move the system to a node:
-void walkTo(node a);
-// Returns true if node was already visited in the grid:
-bool visited(node a);
+// TYPEDEFS
+typedef pair<int,int> node;				// Renames coordinate pair for convenience
+// GLOBAL VARIABLES
+unordered_map<string,bool> grid; 		// Grid structure global variable
+mt19937 gen;							// Mersenne Twister generator
+uniform_real_distribution<double> uDis; // Uniform distribution
+// FUNCTIONS
+string ptos(pair<int,int> a); 			// Converts a pair to a string
+void walkTo(node a);					// Performs all operations to move the system to a node
+bool visited(node a);					// Returns true if node was already visited in the grid
+void initGenerator();					// Initiailzes the RNG
+double unif();							// Returns a real number from 0 to 1
 
 
 ////////////////////
@@ -28,12 +30,8 @@ bool visited(node a);
 
 int main(){
 
-	// Obtain a seed from the system clock:
-	unsigned seed1 = chrono::system_clock::now().time_since_epoch().count();
-	// Initializes MT generator:
-	mt19937 gen = mt19937(seed1);
-	// Initializes normal distribution:
-	uniform_real_distribution<double> uDis(0.0, 1.0);
+	// Initializes RNG classes:
+	initGenerator();
 
 	// Grid structure:
 	node init = node(0,0);
@@ -41,9 +39,7 @@ int main(){
 	node init3 = node(0,2);
 	walkTo(init);
 
-	//uDis(gen)
-
-	cout << visited(init) << endl;
+	cout << visited(init) << " " << unif() << endl;
 
 }
 
@@ -70,4 +66,19 @@ bool visited(node a){
 	} else {
 		return true;
 	}
+}
+
+// Initiailzes the RNG:
+void initGenerator(){
+	// Obtain a seed from the system clock:
+	unsigned seed1 = chrono::system_clock::now().time_since_epoch().count();
+	// Initializes MT generator:
+	gen = mt19937(seed1);
+	// Initializes normal distribution:
+	uDis = uniform_real_distribution<double>(0.0, 1.0);
+}
+
+// Returns a real number from 0 to 1:
+double unif(){
+	return uDis(gen);
 }
