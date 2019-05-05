@@ -3,6 +3,7 @@
 #include <random>			// For RNG
 #include <unordered_map>	// For storing grid structure
 #include <string>			// For strings
+#include <algorithm>		// To remove elements from vectors by value
 
 // MACROS:
 #define ptos(a) to_string(a.first) + "," + to_string(a.second)
@@ -15,19 +16,27 @@ using namespace std;
 
 // TYPEDEFS
 typedef pair<int,int> node;								// Renames coordinate pair for convenience
+typedef struct tabu Tabu;
+struct tabu {
+	node avoid;
+	node current;
+	Tabu* pNext;
+};
 // GLOBAL VARIABLES
-unordered_map<string,bool> grid; 						// Grid structure global variable
-vector<node> path;										// Path being formed
-mt19937 gen;											// Mersenne Twister generator
-uniform_real_distribution<double> uDis; 				// Uniform distribution
+int pathSize = 10000;										// Size of path to generate
+unordered_map<string,bool> grid; 							// Grid structure global variable
+vector<node> path;											// Path being formed
+Tabu** tabuList;											// tabuList[i] is a linked list of nodes unvisitable from node path[i]
+mt19937 gen;												// Mersenne Twister generator
+uniform_real_distribution<double> uDis; 					// Uniform distribution
 // FUNCTIONS
-void walkTo(node a);									// Performs all operations to move the system to a node
-node backtrack();										// Walks backwards 1 node
-bool visited(node a);									// Returns true if node was already visited in the grid
-void availableNodes(node a, vector<node>* available);	// Returns a number from 0 to 4 representing how many nodes the path may go to
-node decideDestination(vector<node>* available);		// Returns the next node where the path should go to
-void initGenerator();									// Initiailzes the RNG
-double sampleUnif();									// Returns a real number from 0 to 1
+void walkTo(node a);										// Performs all operations to move the system to a node
+node backtrack(int iteration);								// Walks backwards 1 node
+bool visited(node a);										// Returns true if node was already visited in the grid
+void availableNodes(int iteration, vector<node>* available);// Returns a number from 0 to 4 representing how many nodes the path may go to
+node decideDestination(vector<node>* available);			// Returns the next node where the path should go to
+void initGenerator();										// Initiailzes the RNG
+double sampleUnif();										// Returns a real number from 0 to 1
 
 // Helper function to print pairs:
 template <typename T, typename S>
@@ -39,6 +48,21 @@ ostream& operator<<(ostream& os, const pair<T, S>& v)
     return os;
 }
 
+// Helper function to print vectors:
+template <typename T>
+ostream& operator<<(ostream& os, const vector<T>& v)
+{
+    os << "[";
+    for (int i = 0; i < v.size(); ++i) {
+        os << v[i];
+        if (i != v.size() - 1)
+            os << ", ";
+    }
+    os << "]\n";
+    return os;
+}
+
+
 
 ////////////////////	////////////////////	////////////////////
 /// MAIN PROGRAM ///	/// MAIN PROGRAM ///	/// MAIN PROGRAM ///
@@ -48,28 +72,40 @@ int main(){
 
 	// Initializes RNG classes:
 	initGenerator();
+	// Initializes list of nodes that impede a self-avoiding path:
+	tabuList = new Tabu*[pathSize]();
 
 	// Initilizes grid:
 	node current = node(0,0);
 	walkTo(current);
 
-	for (int i=0; i<1000; i++){
+	// Constructs a path:
+	for (int i=0; i<pathSize-1; i++){
+		cout << i << endl;
 		// Retrieves available nodes:
 		vector<node>* available = new vector<node>;
-		availableNodes(current, available);
+		availableNodes(i, available);
 		// Checks if any node is available:
 		if (available->size() != 0){
 			// Decides where to go:
 			current = decideDestination(available);
 			walkTo(current);
 			delete available;
-			cout << current << endl;
+			//cout << current << endl;
 		// If no nodes are available:
 		} else {
 			// Undo time by 1 iteration:
-			 current = backtrack();
+			//cout << "Deadend at node " << current << endl;
+			current = backtrack(i);
+			//cout << "Backtracking to node " << current << endl;
+			i-=2;
+			// Impedes dead end from happening again:
+			//delete tabu;
+			//tabu =
 		}
 	}
+
+	cout << "Generated path with length " << path.size() << endl;
 
 }
 
@@ -87,9 +123,20 @@ void walkTo(node a){
 	path.push_back(a);
 }
 
-node backtrack(){
+node backtrack(int iteration){
 	// Removes node from hash table:
 	grid.erase(ptos(path.back()));
+	// Adds this node to tabu list belonging to previous iteration. Runs through tabu list:
+	Tabu** find = &(tabuList[iteration-1]);
+	while (*find != NULL){
+		find = &((*find)->pNext);
+	}
+	// Creates entry to be appended:
+	Tabu* currentTabu = new Tabu;
+	currentTabu->avoid = path.back();
+	currentTabu->current = path.end()[-2];
+	currentTabu->pNext = NULL;
+	*find = currentTabu;
 	// Removes last node from path:
 	path.pop_back();
 	// Returns previous node (new current position):
@@ -98,6 +145,7 @@ node backtrack(){
 
 // Returns true if node was already visited in the grid:
 bool visited(node a){
+	// Checks if node key exists in hash table that represents the grid:
 	if (grid.count(ptos(a)) == 0){
 		return false;
 	} else {
@@ -106,7 +154,9 @@ bool visited(node a){
 }
 
 // Returns a number from 0 to 4 representing how many nodes the path may go to:
-void availableNodes(node a, vector<node>* available){
+void availableNodes(int iteration, vector<node>* available){
+	// Retrieves current node:
+	node a = path.back();
 	// Checks each grid possibility individually:
 	if (grid.count(ptos(node(a.first,a.second+1))) == 0){
 		available->push_back(node(a.first,a.second+1));
@@ -120,6 +170,21 @@ void availableNodes(node a, vector<node>* available){
 	if (grid.count(ptos(node(a.first-1,a.second))) == 0){
 		available->push_back(node(a.first-1,a.second));
 	}
+	// Retrieves tabu list for this iteration:
+	Tabu* currentTabu = tabuList[iteration];
+	//cout << "Available before tabu removal: " << *available << endl;
+	// Runs through tabu list for this iteration:
+	while(currentTabu != NULL){
+		// Checks if this tabu is relevant to this node:
+		if (currentTabu->current == a){
+			//cout << "Found tabu " << currentTabu->avoid << endl;
+			// Removes tabu from available vector:
+			available->erase(remove(available->begin(), available->end(), currentTabu->avoid), available->end());
+		}
+		// Checks next tabu:
+		currentTabu = currentTabu->pNext;
+	}
+	//cout << "Available after tabu removal: " << *available << endl;
 }
 
 // Returns the next node where the path should go to:
