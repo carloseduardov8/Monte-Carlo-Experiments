@@ -23,7 +23,8 @@ struct tabu {
 	Tabu* pNext;
 };
 // GLOBAL VARIABLES
-int pathSize = 10000;										// Size of path to generate
+bool verbose = false;										// True if program should print what it is doing
+int pathSize = 5000;										// Size of path to generate
 unordered_map<string,bool> grid; 							// Grid structure global variable
 vector<node> path;											// Path being formed
 Tabu** tabuList;											// tabuList[i] is a linked list of nodes unvisitable from node path[i]
@@ -81,7 +82,7 @@ int main(){
 
 	// Constructs a path:
 	for (int i=0; i<pathSize-1; i++){
-		cout << i << endl;
+		if (i%100==0) cout << i << endl;
 		// Retrieves available nodes:
 		vector<node>* available = new vector<node>;
 		availableNodes(i, available);
@@ -91,18 +92,19 @@ int main(){
 			current = decideDestination(available);
 			walkTo(current);
 			delete available;
-			//cout << current << endl;
+			if (verbose) cout << "Moving to " << current << endl;
 		// If no nodes are available:
 		} else {
 			// Undo time by 1 iteration:
-			//cout << "Deadend at node " << current << endl;
+			if (verbose) cout << "Deadend at node " << current << endl;
 			current = backtrack(i);
-			//cout << "Backtracking to node " << current << endl;
+			if (verbose) cout << "Backtracking to node " << current << endl;
 			i-=2;
 			// Impedes dead end from happening again:
 			//delete tabu;
 			//tabu =
 		}
+		delete available;
 	}
 
 	cout << "Generated path with length " << path.size() << endl;
@@ -139,6 +141,8 @@ node backtrack(int iteration){
 	*find = currentTabu;
 	// Removes last node from path:
 	path.pop_back();
+	// Clears this iteration's tabu list:
+	tabuList[iteration] = NULL;
 	// Returns previous node (new current position):
 	return path.back();
 }
@@ -172,19 +176,19 @@ void availableNodes(int iteration, vector<node>* available){
 	}
 	// Retrieves tabu list for this iteration:
 	Tabu* currentTabu = tabuList[iteration];
-	//cout << "Available before tabu removal: " << *available << endl;
+	if (verbose) cout << "Available before tabu removal: " << *available << endl;
 	// Runs through tabu list for this iteration:
 	while(currentTabu != NULL){
 		// Checks if this tabu is relevant to this node:
 		if (currentTabu->current == a){
-			//cout << "Found tabu " << currentTabu->avoid << endl;
+			if (verbose) cout << "Found tabu " << currentTabu->avoid << endl;
 			// Removes tabu from available vector:
 			available->erase(remove(available->begin(), available->end(), currentTabu->avoid), available->end());
 		}
 		// Checks next tabu:
 		currentTabu = currentTabu->pNext;
 	}
-	//cout << "Available after tabu removal: " << *available << endl;
+	if (verbose) cout << "Available after tabu removal: " << *available << endl;
 }
 
 // Returns the next node where the path should go to:
