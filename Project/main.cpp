@@ -22,9 +22,8 @@ typedef pair<int,int> node;									// Renames coordinate pair for convenience
 // GLOBAL VARIABLES
 bool verbose = false;										// True if program should print what it is doing
 int pathSize = N + 1;										// Size (in nodes) of path to generate. SAWs are usually counted by steps (N)
-int totalSamples = 100000;									// Total number of samples to collect (excluding thermalization)
-int sampleStep = 2;											// For each sample collected, discard the next sampleStep before collecting a new one
-int thermalization = 40000;									// Number of samples to discard before collecting statistics
+int totalSamples = 10000000;								// Total number of samples to collect (excluding thermalization)
+int thermalization = 10000;									// Number of samples to discard before collecting statistics
 unordered_map<string,bool> hashTable; 						// Grid structure global variable
 vector<node> path;											// Path being formed
 mt19937 pivotGen, transformationGen;						// Mersenne Twister generators
@@ -90,25 +89,14 @@ int main(){
 		// Samples a 2D transformation:
 		vector<int> matrix = sampleTransformation();
 		// Checks if transformation, when applied to the [k+1,n-1] path elements, collides with [0,k]:
-		if (checkCollision(pivot, &matrix) == true){
-			//cout << "Collided" << endl;
-		} else {
-			// Increments number of samples obtained before taking the next statistic analysis:
-			stepCount ++;
-			// Checks if Markov Chain has already taken some distance from the previous observation:
-			if (stepCount == sampleStep){
-				// Resets the number of samples needed before taking an observation:
-				stepCount = 0;
-				// Increments number of samples:
-				samplesCount++;
-				// Accounts for thermalization:
-				if (samplesCount > thermalization){
-					// Selects last node in the walk:
-					node endNode = path[pathSize-1];
-					// Adds end-to-end square distance to the MC accumulator:
-					accumulator += pow(endNode.first,2) + pow(endNode.second,2);
-				}
-			}
+		checkCollision(pivot, &matrix);
+		// Increments number of samples:
+		samplesCount++;
+		if (samplesCount > thermalization){
+			// Selects last node in the walk:
+			node endNode = path[pathSize-1];
+			// Adds end-to-end square distance to the MC accumulator:
+			accumulator += pow(endNode.first,2) + pow(endNode.second,2);
 		}
 	}
 
