@@ -5,9 +5,11 @@
 #include <string>			// For strings
 #include <algorithm>		// To remove elements from vectors by value
 #include <fstream>			// For file operations
+#include <cmath>			// For mathematical operations
 
 // MACROS:
 #define ptos(a) to_string(a.first) + "," + to_string(a.second)
+#define N 15 // SAW is counted by steps, so pathSize = N + 1
 
 using namespace std;
 
@@ -19,7 +21,10 @@ using namespace std;
 typedef pair<int,int> node;									// Renames coordinate pair for convenience
 // GLOBAL VARIABLES
 bool verbose = false;										// True if program should print what it is doing
-int pathSize = 10;										// Size of path to generate
+int pathSize = N + 1;										// Size (in nodes) of path to generate. SAWs are usually counted by steps (N)
+int totalSamples = 100000;									// Total number of samples to collect (excluding thermalization)
+int sampleStep = 2;											// For each sample collected, discard the next sampleStep before collecting a new one
+int thermalization = 40000;									// Number of samples to discard before collecting statistics
 unordered_map<string,bool> hashTable; 						// Grid structure global variable
 vector<node> path;											// Path being formed
 mt19937 pivotGen, transformationGen;						// Mersenne Twister generators
@@ -71,9 +76,11 @@ int main(){
 	// Generates initial SAW:
 	generateRod();
 
-	int totalSamples = 0;
+	int samplesCount = 0;
+	int stepCount = 0;
+	double accumulator = 0;
 
-	while(true){
+	while(samplesCount < totalSamples){
 		// Clears hash table:
 		hashTable.clear();
 		// Chooses a pivot:
@@ -84,16 +91,31 @@ int main(){
 		vector<int> matrix = sampleTransformation();
 		// Checks if transformation, when applied to the [k+1,n-1] path elements, collides with [0,k]:
 		if (checkCollision(pivot, &matrix) == true){
-			cout << "Collided" << endl;
+			//cout << "Collided" << endl;
 		} else {
-			totalSamples++;
-			cout << "Got " << totalSamples << " samples" << endl;
-			if (totalSamples % 200 == 0){
-				SAWtoFile("saw.txt");
+			// Increments number of samples obtained before taking the next statistic analysis:
+			stepCount ++;
+			// Checks if Markov Chain has already taken some distance from the previous observation:
+			if (stepCount == sampleStep){
+				// Resets the number of samples needed before taking an observation:
+				stepCount = 0;
+				// Increments number of samples:
+				samplesCount++;
+				// Accounts for thermalization:
+				if (samplesCount > thermalization){
+					// Selects last node in the walk:
+					node endNode = path[pathSize-1];
+					// Adds end-to-end square distance to the MC accumulator:
+					accumulator += pow(endNode.first,2) + pow(endNode.second,2);
+				}
 			}
 		}
 	}
 
+	// Calculates mean of accumulator:
+	double result = accumulator*1.0/(totalSamples-thermalization);
+
+	cout << "Result: " << result << endl;
 
 }
 
