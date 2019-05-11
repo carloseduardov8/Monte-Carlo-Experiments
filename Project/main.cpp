@@ -19,7 +19,7 @@ using namespace std;
 typedef pair<int,int> node;									// Renames coordinate pair for convenience
 // GLOBAL VARIABLES
 bool verbose = false;										// True if program should print what it is doing
-int pathSize = 5000;										// Size of path to generate
+int pathSize = 10;										// Size of path to generate
 unordered_map<string,bool> hashTable; 						// Grid structure global variable
 vector<node> path;											// Path being formed
 mt19937 pivotGen, transformationGen;						// Mersenne Twister generators
@@ -29,6 +29,7 @@ void initGenerator();										// Initiailzes the RNG
 int samplePivot();											// Returns an int from 0 to pathSize-1
 vector<int> sampleTransformation();							// Samples a matrix (represented as vector) with the transformation to be applied
 void putInHash(int pivot);									// Puts all nodes of the walk into the hash table up to (and including) the node in position pivot
+bool checkCollision(int pivot, vector<int>* matrix);		// Checks if [pivot+1, n-1] elements, under transfomation matrix, collide with [0, pivot] elements. If not, copies them to the current path
 void generateRod();											// Generates an initial rod-shaped self-avoiding walk
 void SAWtoFile(string filePath);							// Saves SAW coordinates to file
 
@@ -70,17 +71,29 @@ int main(){
 	// Generates initial SAW:
 	generateRod();
 
-	// Clears hash table:
-	hashTable.clear();
-	// Chooses a pivot:
-	int pivot = samplePivot();
-	// Puts all elements before (and including) the pivot into the hash table:
-	putInHash(pivot);
-	// Samples a 2D transformation:
-	vector<int> matrix = sampleTransformation();
+	int totalSamples = 0;
 
-	cout << "Pivot: " << pivot << endl;
-	cout << "Transformation: " << matrix << endl;
+	while(true){
+		// Clears hash table:
+		hashTable.clear();
+		// Chooses a pivot:
+		int pivot = samplePivot();
+		// Puts all elements before (and including) the pivot into the hash table:
+		putInHash(pivot);
+		// Samples a 2D transformation:
+		vector<int> matrix = sampleTransformation();
+		// Checks if transformation, when applied to the [k+1,n-1] path elements, collides with [0,k]:
+		if (checkCollision(pivot, &matrix) == true){
+			cout << "Collided" << endl;
+		} else {
+			totalSamples++;
+			cout << "Got " << totalSamples << " samples" << endl;
+			if (totalSamples % 200 == 0){
+				SAWtoFile("saw.txt");
+			}
+		}
+	}
+
 
 }
 
@@ -88,6 +101,44 @@ int main(){
 /////////////////////////
 /// UTILITY FUNCTIONS ///
 /////////////////////////
+
+
+// Checks if [pivot+1, n-1] elements, under transfomation matrix, collide with [0, pivot] elements. If not, copies them to the current path:
+bool checkCollision(int pivot, vector<int>* matrix){
+	// Placeholder vector to hold new [pivot+1, n-1] coordinates:
+	vector<node> placeholder;
+	// Fills placeholder vector with newly calculated coordinates while checking for collisions:
+	for (int i=pivot+1; i<pathSize; i++){
+		node newCoord(0,0);
+		// Subtracts pivot from coordinate (takes pivot as origin):
+		newCoord.first = path[i].first - path[pivot].first;
+		newCoord.second = path[i].second - path[pivot].second;
+		// Applies transformation:
+		int a = (newCoord.first * matrix->at(0)) + (newCoord.second * matrix->at(2));
+		int b = (newCoord.first * matrix->at(1)) + (newCoord.second * matrix->at(3));
+		newCoord.first = a;
+		newCoord.second = b;
+		// Adds pivot back to coordinate (restores position):
+		newCoord.first = newCoord.first + path[pivot].first;
+		newCoord.second = newCoord.second + path[pivot].second;
+		// If it hasn't collided:
+		if (hashTable.count(ptos(newCoord)) == 0){
+			// Adds to the placeholder vector:
+			placeholder.push_back(newCoord);
+		// If it has collided:
+		} else {
+			// Ends function and returns true (collision detected):
+			return true;
+		}
+	}
+	// If no collisions were detected, copies placeholder vector to [pivot+1, n-1] elements of path:
+	for (int i=pivot+1; i<pathSize; i++){
+		// Copies first element of placeholder to pivot+1 element of path:
+		path[i] = placeholder[i-pivot-1];
+	}
+	// Returns false (no collision detected):
+	return false;
+}
 
 // Puts all nodes of the walk into the hash table up to (and including) the node in position pivot:
 void putInHash(int pivot){
