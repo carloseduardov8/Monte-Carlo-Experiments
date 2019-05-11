@@ -4,6 +4,7 @@
 #include <unordered_map>	// For storing grid structure
 #include <string>			// For strings
 #include <algorithm>		// To remove elements from vectors by value
+#include <fstream>			// For file operations
 
 // MACROS:
 #define ptos(a) to_string(a.first) + "," + to_string(a.second)
@@ -15,29 +16,21 @@ using namespace std;
 ///////////////////////////
 
 // TYPEDEFS
-typedef pair<int,int> node;								// Renames coordinate pair for convenience
-typedef struct tabu Tabu;
-struct tabu {
-	node avoid;
-	node current;
-	Tabu* pNext;
-};
+typedef pair<int,int> node;									// Renames coordinate pair for convenience
 // GLOBAL VARIABLES
 bool verbose = false;										// True if program should print what it is doing
 int pathSize = 5000;										// Size of path to generate
-unordered_map<string,bool> grid; 							// Grid structure global variable
+unordered_map<string,bool> hashTable; 						// Grid structure global variable
 vector<node> path;											// Path being formed
-Tabu** tabuList;											// tabuList[i] is a linked list of nodes unvisitable from node path[i]
-mt19937 gen;												// Mersenne Twister generator
-uniform_real_distribution<double> uDis; 					// Uniform distribution
+mt19937 pivotGen, transformationGen;						// Mersenne Twister generators
+uniform_int_distribution<int> uPivot, uTransformation;		// Uniform integer distributions
 // FUNCTIONS
-void walkTo(node a);										// Performs all operations to move the system to a node
-node backtrack(int iteration);								// Walks backwards 1 node
-bool visited(node a);										// Returns true if node was already visited in the grid
-void availableNodes(int iteration, vector<node>* available);// Returns a number from 0 to 4 representing how many nodes the path may go to
-node decideDestination(vector<node>* available);			// Returns the next node where the path should go to
 void initGenerator();										// Initiailzes the RNG
-double sampleUnif();										// Returns a real number from 0 to 1
+int samplePivot();											// Returns an int from 0 to pathSize-1
+vector<int> sampleTransformation();							// Samples a matrix (represented as vector) with the transformation to be applied
+void putInHash(int pivot);									// Puts all nodes of the walk into the hash table up to (and including) the node in position pivot
+void generateRod();											// Generates an initial rod-shaped self-avoiding walk
+void SAWtoFile(string filePath);							// Saves SAW coordinates to file
 
 // Helper function to print pairs:
 template <typename T, typename S>
@@ -59,7 +52,7 @@ ostream& operator<<(ostream& os, const vector<T>& v)
         if (i != v.size() - 1)
             os << ", ";
     }
-    os << "]\n";
+    os << "]";
     return os;
 }
 
@@ -73,41 +66,21 @@ int main(){
 
 	// Initializes RNG classes:
 	initGenerator();
-	// Initializes list of nodes that impede a self-avoiding path:
-	tabuList = new Tabu*[pathSize]();
 
-	// Initilizes grid:
-	node current = node(0,0);
-	walkTo(current);
+	// Generates initial SAW:
+	generateRod();
 
-	// Constructs a path:
-	for (int i=0; i<pathSize-1; i++){
-		if (i%100==0) cout << i << endl;
-		// Retrieves available nodes:
-		vector<node>* available = new vector<node>;
-		availableNodes(i, available);
-		// Checks if any node is available:
-		if (available->size() != 0){
-			// Decides where to go:
-			current = decideDestination(available);
-			walkTo(current);
-			delete available;
-			if (verbose) cout << "Moving to " << current << endl;
-		// If no nodes are available:
-		} else {
-			// Undo time by 1 iteration:
-			if (verbose) cout << "Deadend at node " << current << endl;
-			current = backtrack(i);
-			if (verbose) cout << "Backtracking to node " << current << endl;
-			i-=2;
-			// Impedes dead end from happening again:
-			//delete tabu;
-			//tabu =
-		}
-		delete available;
-	}
+	// Clears hash table:
+	hashTable.clear();
+	// Chooses a pivot:
+	int pivot = samplePivot();
+	// Puts all elements before (and including) the pivot into the hash table:
+	putInHash(pivot);
+	// Samples a 2D transformation:
+	vector<int> matrix = sampleTransformation();
 
-	cout << "Generated path with length " << path.size() << endl;
+	cout << "Pivot: " << pivot << endl;
+	cout << "Transformation: " << matrix << endl;
 
 }
 
@@ -116,109 +89,98 @@ int main(){
 /// UTILITY FUNCTIONS ///
 /////////////////////////
 
-
-// Performs all operations to move the system to a node:
-void walkTo(node a){
-	// Inserts node into hash table:
-	grid.insert(make_pair(ptos(a),true));
-	// Inserts node into path:
-	path.push_back(a);
-}
-
-node backtrack(int iteration){
-	// Removes node from hash table:
-	grid.erase(ptos(path.back()));
-	// Adds this node to tabu list belonging to previous iteration. Runs through tabu list:
-	Tabu** find = &(tabuList[iteration-1]);
-	while (*find != NULL){
-		find = &((*find)->pNext);
-	}
-	// Creates entry to be appended:
-	Tabu* currentTabu = new Tabu;
-	currentTabu->avoid = path.back();
-	currentTabu->current = path.end()[-2];
-	currentTabu->pNext = NULL;
-	*find = currentTabu;
-	// Removes last node from path:
-	path.pop_back();
-	// Clears this iteration's tabu list:
-	tabuList[iteration] = NULL;
-	// Returns previous node (new current position):
-	return path.back();
-}
-
-// Returns true if node was already visited in the grid:
-bool visited(node a){
-	// Checks if node key exists in hash table that represents the grid:
-	if (grid.count(ptos(a)) == 0){
-		return false;
-	} else {
-		return true;
+// Puts all nodes of the walk into the hash table up to (and including) the node in position pivot:
+void putInHash(int pivot){
+	// Runs through the current SAW:
+	for (int i=0; i<=pivot; i++){
+		// Inserts node into hash table:
+		hashTable.insert(make_pair(ptos(path[i]),true));
 	}
 }
 
-// Returns a number from 0 to 4 representing how many nodes the path may go to:
-void availableNodes(int iteration, vector<node>* available){
-	// Retrieves current node:
-	node a = path.back();
-	// Checks each grid possibility individually:
-	if (grid.count(ptos(node(a.first,a.second+1))) == 0){
-		available->push_back(node(a.first,a.second+1));
+
+// Generates an initial rod-shaped self-avoiding walk:
+void generateRod(){
+	// Loops through all points in the walk:
+	for (int i=0; i<pathSize; i++){
+		// Adds points (i,0) to the walk:
+		path.push_back(node(i,0));
 	}
-	if (grid.count(ptos(node(a.first,a.second-1))) == 0){
-		available->push_back(node(a.first,a.second-1));
-	}
-	if (grid.count(ptos(node(a.first+1,a.second))) == 0){
-		available->push_back(node(a.first+1,a.second));
-	}
-	if (grid.count(ptos(node(a.first-1,a.second))) == 0){
-		available->push_back(node(a.first-1,a.second));
-	}
-	// Retrieves tabu list for this iteration:
-	Tabu* currentTabu = tabuList[iteration];
-	if (verbose) cout << "Available before tabu removal: " << *available << endl;
-	// Runs through tabu list for this iteration:
-	while(currentTabu != NULL){
-		// Checks if this tabu is relevant to this node:
-		if (currentTabu->current == a){
-			if (verbose) cout << "Found tabu " << currentTabu->avoid << endl;
-			// Removes tabu from available vector:
-			available->erase(remove(available->begin(), available->end(), currentTabu->avoid), available->end());
-		}
-		// Checks next tabu:
-		currentTabu = currentTabu->pNext;
-	}
-	if (verbose) cout << "Available after tabu removal: " << *available << endl;
 }
 
-// Returns the next node where the path should go to:
-node decideDestination(vector<node>* available){
-	// Calculates probabilities:
-	double unif = sampleUnif();
-	double prob = 1.0/available->size();
-	// Decides where to go:
-	for (int i = 1; i<=4; i++){
-		// Checks if node was selected:
-		if (unif <= prob*i){
-			// Elects the node:
-			return available->at(i-1);
-		}
+// Saves SAW coordinates to file:
+void SAWtoFile(string filePath){
+	// Prepares output file:
+	ofstream file;
+	file.open(filePath);
+	// Loops through SAW coordinates and save them:
+	for (int i=0; i<path.size(); i++){
+		file << path[i].first << " " << path[i].second << endl;
 	}
-	// If loop finished, prints out an error:
-	cout << endl << "ERROR: Couldn't decide on a node to continue to. Prob = " << prob << " and available nodes = " << available->size() << endl;
 }
 
 // Initiailzes the RNG:
 void initGenerator(){
 	// Obtain a seed from the system clock:
 	unsigned seed1 = chrono::system_clock::now().time_since_epoch().count();
-	// Initializes MT generator:
-	gen = mt19937(seed1);
-	// Initializes normal distribution:
-	uDis = uniform_real_distribution<double>(0.0, 1.0);
+	// Initializes MT generators:
+	pivotGen = mt19937(seed1);
+	transformationGen = mt19937(seed1/5);
+	// Initializes pivot distribution:
+	uPivot = uniform_int_distribution<int>(0.0, pathSize-1);
+	// Initializes matrix transform distribution (rotation, reflexion, etc):
+	uTransformation = uniform_int_distribution<int>(0.0, 6);
 }
 
-// Returns a real number from 0 to 1:
-double sampleUnif(){
-	return uDis(gen);
+// Returns an int from 0 to pathSize-1:
+int samplePivot(){
+	return uPivot(pivotGen);
+}
+
+// Samples a matrix (represented as vector) with the transformation to be applied:
+vector<int> sampleTransformation(){
+	vector<int> matrix(4);
+	// Samples from the distribution:
+	int sample = uTransformation(transformationGen);
+	// Checks which transform corresponds to int sample:
+	switch(sample){
+		// +90 rotation:
+		case 0:
+			matrix[0] = 0;  matrix[1] = -1;
+			matrix[2] = 1;  matrix[3] = 0;
+			break;
+		// -90 rotation:
+		case 1:
+			matrix[0] = 0;  matrix[1] = 1;
+			matrix[2] = -1; matrix[3] = 0;
+			break;
+		// 180 rotation:
+		case 2:
+			matrix[0] = -1; matrix[1] = 0;
+			matrix[2] = 0;  matrix[3] = -1;
+			break;
+		// X-axis reflection:
+		case 3:
+			matrix[0] = 1;  matrix[1] = 0;
+			matrix[2] = 0; 	matrix[3] = -1;
+			break;
+		// Y-axis reflection:
+		case 4:
+			matrix[0] = -1; matrix[1] = 0;
+			matrix[2] = 0; 	matrix[3] = 1;
+			break;
+		// y=x reflection:
+		case 5:
+			matrix[0] = 0;  matrix[1] = 1;
+			matrix[2] = 1;  matrix[3] = 0;
+			break;
+		// y=-x reflection:
+		case 6:
+			matrix[0] = 0;  matrix[1] = -1;
+			matrix[2] = -1; matrix[3] = 0;
+			break;
+	}
+	// Returns the sampled matrix:
+	return matrix;
+
 }
