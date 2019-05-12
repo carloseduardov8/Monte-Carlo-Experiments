@@ -9,7 +9,7 @@
 
 // MACROS:
 #define ptos(a) to_string(a.first) + "," + to_string(a.second)
-#define N 15 // SAW is counted by steps, so pathSize = N + 1
+#define N 80 // SAW is counted by steps, so pathSize = N + 1
 
 using namespace std;
 
@@ -22,8 +22,8 @@ typedef pair<int,int> node;									// Renames coordinate pair for convenience
 // GLOBAL VARIABLES
 bool verbose = false;										// True if program should print what it is doing
 int pathSize = N + 1;										// Size (in nodes) of path to generate. SAWs are usually counted by steps (N)
-int totalSamples = 10000000;								// Total number of samples to collect (excluding thermalization)
-int thermalization = 10000;									// Number of samples to discard before collecting statistics
+int totalSamples = 100000;									// Total number of samples to collect (excluding thermalization)
+int thermalization = 1000;									// Number of samples to discard before collecting statistics
 unordered_map<string,bool> hashTable; 						// Grid structure global variable
 vector<node> path;											// Path being formed
 mt19937 pivotGen, transformationGen;						// Mersenne Twister generators
@@ -34,6 +34,8 @@ int samplePivot();											// Returns an int from 0 to pathSize-1
 vector<int> sampleTransformation();							// Samples a matrix (represented as vector) with the transformation to be applied
 void putInHash(int pivot);									// Puts all nodes of the walk into the hash table up to (and including) the node in position pivot
 bool checkCollision(int pivot, vector<int>* matrix);		// Checks if [pivot+1, n-1] elements, under transfomation matrix, collide with [0, pivot] elements. If not, copies them to the current path
+int endToEndDistance();									// Returns the end to end squared distance of the walk
+int numOfHorseshoes();										// Returns the number of horseshoes contained in the walk
 void generateRod();											// Generates an initial rod-shaped self-avoiding walk
 void SAWtoFile(string filePath);							// Saves SAW coordinates to file
 
@@ -77,7 +79,7 @@ int main(){
 
 	int samplesCount = 0;
 	int stepCount = 0;
-	double accumulator = 0;
+	int accumulator = 0;
 
 	while(samplesCount < totalSamples){
 		// Clears hash table:
@@ -96,7 +98,7 @@ int main(){
 			// Selects last node in the walk:
 			node endNode = path[pathSize-1];
 			// Adds end-to-end square distance to the MC accumulator:
-			accumulator += pow(endNode.first,2) + pow(endNode.second,2);
+			accumulator += numOfHorseshoes();
 		}
 	}
 
@@ -111,6 +113,38 @@ int main(){
 /////////////////////////
 /// UTILITY FUNCTIONS ///
 /////////////////////////
+
+// Returns the number of horseshoes contained in the walk:
+int numOfHorseshoes(){
+	// accumulator for number of horseshoes:
+	int horseshoes = 0;
+	// Runs through the walk:
+	for (int i=3; i<pathSize; i++){
+		// Checks all 4 possiblities for a horseshoe to exist.
+		// If points are in the same x:
+		if (path[i-3].first == path[i].first){
+			// Checks if y coordinates are within distance 1:
+			if ( (path[i-3].second == (path[i].second-1)) || (path[i-3].second == (path[i].second+1)) ){
+				// Increments number of horseshoes:
+				horseshoes++;
+			}
+		// If points are in the same y:
+		} else if (path[i-3].second == path[i].second){
+			// Checks if x coordinates are within distance 1:
+			if ( (path[i-3].first == (path[i].first-1)) || (path[i-3].first == (path[i].first+1)) ){
+				// Increments number of horseshoes:
+				horseshoes++;
+			}
+		}
+	}
+	// Returns the number of horseshoes:
+	return horseshoes;
+}
+
+// Returns the end to end squared distance of the walk:
+int endToEndDistance(){
+	return pow(path[pathSize-1].first,2) + pow(path[pathSize-1].second,2);
+}
 
 
 // Checks if [pivot+1, n-1] elements, under transfomation matrix, collide with [0, pivot] elements. If not, copies them to the current path:
