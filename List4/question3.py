@@ -1,9 +1,9 @@
 import numpy as np
 import math
 
-n_ring = 1023
-n_tree = 1023
-n_grid = 32
+n_ring = 1023	# Total nodes will be n_ring
+n_tree = 10		# Total nodes will be 2**n_tree - 1
+n_grid = 32		# Total nodes will be n_grid * n_grid
 
 
 def create_ring():
@@ -23,9 +23,10 @@ def create_ring():
 	return matrix, pi, n_ring
 
 def create_tree():
-	matrix = np.zeros((n_tree,n_tree))
-	pi = np.zeros((n_tree))
-	for i in range(n_tree):
+	nodes = (2**n_tree) - 1
+	matrix = np.zeros((nodes,nodes))
+	pi = np.zeros((nodes))
+	for i in range(nodes):
 		# Faz o self-loop:
 		matrix[i][i] = 0.5
 		# Raiz:
@@ -34,7 +35,7 @@ def create_tree():
 			matrix[i][2] = 0.25
 			pi[i] = 1.0/1022
 		# Folhas:
-		elif i > 510:
+		elif i > (2**(n_tree-1)) - 2:
 			father = math.floor((i+1)/2)
 			matrix[i][father-1] = 0.5
 			pi[i] = 1.0/2044
@@ -47,7 +48,7 @@ def create_tree():
 			matrix[i][firstChild-1] = 1.0/6
 			matrix[i][secondChild-1] = 1.0/6
 			pi[i] = 3.0/2044
-	return matrix, pi, n_tree
+	return matrix, pi, nodes
 
 
 def create_grid():
@@ -111,7 +112,7 @@ def total_distance(v1,v2):
 	return acc*1.0/2
 
 
-matrix, pi, nodes = create_grid()
+matrix, pi, nodes = create_tree()
 pi_t = np.zeros((nodes))
 pi_t[455] = 1
 for i in range(100000):
