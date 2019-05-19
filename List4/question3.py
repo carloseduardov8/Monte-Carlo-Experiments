@@ -3,7 +3,7 @@ import math
 
 n_ring = 1023
 n_tree = 1023
-n_grid = 1024
+n_grid = 32
 
 
 def create_ring():
@@ -20,7 +20,7 @@ def create_ring():
 				matrix[i][j] = 0.5
 			else:
 				matrix[i][j] = 0
-	return matrix, pi
+	return matrix, pi, n_ring
 
 def create_tree():
 	matrix = np.zeros((n_tree,n_tree))
@@ -32,12 +32,12 @@ def create_tree():
 		if i == 0:
 			matrix[i][1] = 0.25
 			matrix[i][2] = 0.25
-			pi[i] = 0
+			pi[i] = 1.0/1022
 		# Folhas:
 		elif i > 510:
 			father = math.floor((i+1)/2)
 			matrix[i][father-1] = 0.5
-			pi[i] = 0
+			pi[i] = 1.0/2044
 		# Vertices intermediarios:
 		else:
 			father = math.floor((i+1)/2)
@@ -46,60 +46,63 @@ def create_tree():
 			matrix[i][father-1] = 1.0/6
 			matrix[i][firstChild-1] = 1.0/6
 			matrix[i][secondChild-1] = 1.0/6
-			pi[i] = 0
-	return matrix, pi
+			pi[i] = 3.0/2044
+	return matrix, pi, n_tree
 
 
 def create_grid():
-	matrix = np.zeros((n_grid,n_grid))
-	pi = np.zeros((n_grid))
-	for i in range(n_grid):
+	nodes = n_grid*n_grid
+	matrix = np.zeros((nodes,nodes))
+	pi = np.zeros((nodes))
+	for i in range(nodes):
 		# Faz o self-loop:
 		matrix[i][i] = 0.5
 		# Caso em que i é quina:
 		if i == 0:
 			matrix[i][1] = 0.25
-			matrix[i][32] = 0.25
+			matrix[i][n_grid] = 0.25
 			pi[i] = 1.0/1984
-		elif i == 31:
-			matrix[i][30] = 0.25
-			matrix[i][63] = 0.25
+		elif i == n_grid-1:
+			matrix[i][n_grid-2] = 0.25
+			matrix[i][(2*n_grid)-1] = 0.25
 			pi[i] = 1.0/1984
-		elif i == 992:
-			matrix[i][993] = 0.25
-			matrix[i][960] = 0.25
+		elif i == ((n_grid*n_grid) - n_grid):
+			matrix[i][((n_grid*n_grid) - n_grid)+1] = 0.25
+			matrix[i][((n_grid*n_grid) - 2*n_grid)] = 0.25
 			pi[i] = 1.0/1984
-		elif i == 1023:
-			matrix[i][1022] = 0.25
-			matrix[i][991] = 0.25
+		elif i == ((n_grid*n_grid) - 1):
+			matrix[i][(n_grid*n_grid) - 2] = 0.25
+			matrix[i][(n_grid*n_grid) - 1 - n_grid] = 0.25
 			pi[i] = 1.0/1984
-		elif i > 0 and i < 31:
+		# Casos em que i está nas fileiras das extremidades:
+		elif i > 0 and i < n_grid-1:
 			matrix[i][i-1] = 1.0/6
 			matrix[i][i+1] = 1.0/6
-			matrix[i][i+32] = 1.0/6
+			matrix[i][i+n_grid] = 1.0/6
 			pi[i] = 3.0/3968
-		elif i > 992 and i < 1023:
+		elif i > ((n_grid*n_grid) - n_grid) and i < ((n_grid*n_grid) - 1):
 			matrix[i][i-1] = 1.0/6
 			matrix[i][i+1] = 1.0/6
-			matrix[i][i-32] = 1.0/6
+			matrix[i][i-n_grid] = 1.0/6
 			pi[i] = 3.0/3968
-		elif i % 32 == 0:
-			matrix[i][i-32] = 1.0/6
-			matrix[i][i+32] = 1.0/6
+		elif i % n_grid == 0:
+			matrix[i][i-n_grid] = 1.0/6
+			matrix[i][i+n_grid] = 1.0/6
 			matrix[i][i+1] = 1.0/6
 			pi[i] = 3.0/3968
-		elif (i+1) % 32 == 0:
-			matrix[i][i-32] = 1.0/6
-			matrix[i][i+32] = 1.0/6
+		elif (i+1) % n_grid == 0:
+			matrix[i][i-n_grid] = 1.0/6
+			matrix[i][i+n_grid] = 1.0/6
 			matrix[i][i-1] = 1.0/6
 			pi[i] = 3.0/3968
+		# Caso em que i é nó intermediário:
 		else:
 			matrix[i][i-1] = 0.125
 			matrix[i][i+1] = 0.125
-			matrix[i][i-32] = 0.125
-			matrix[i][i+32] = 0.125
+			matrix[i][i-n_grid] = 0.125
+			matrix[i][i+n_grid] = 0.125
 			pi[i] = 1.0/992
-	return matrix, pi
+	return matrix, pi, nodes
 
 def total_distance(v1,v2):
 	acc = 0
@@ -108,10 +111,10 @@ def total_distance(v1,v2):
 	return acc*1.0/2
 
 
-matrix, pi = create_tree()
-pi_t = np.zeros((n_tree))
+matrix, pi, nodes = create_grid()
+pi_t = np.zeros((nodes))
 pi_t[455] = 1
-for i in range(30000):
+for i in range(100000):
 	mult = pi_t.dot(matrix)
 	pi_t = mult
 print(total_distance(pi_t, pi))
