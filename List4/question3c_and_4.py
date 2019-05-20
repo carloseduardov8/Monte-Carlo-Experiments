@@ -1,12 +1,9 @@
 import numpy as np
 import math
 
-n_ring = 1023	# Total nodes will be n_ring
-n_tree = 10		# Total nodes will be 2**n_tree - 1
-n_grid = 32		# Total nodes will be n_grid * n_grid
+# The following functions will be used throughout questions 3c and 4:
 
-
-def create_ring():
+def create_ring(n_ring):
 	matrix = np.zeros((n_ring,n_ring))
 	pi = np.zeros((n_ring))
 	for i in range(n_ring):
@@ -22,7 +19,7 @@ def create_ring():
 				matrix[i][j] = 0
 	return matrix, pi, n_ring
 
-def create_tree():
+def create_tree(n_tree):
 	# Solves system to calculate stationary distribution:
 	A = np.array([ [2**(n_tree-1), 1, 2**n_tree-2-(2**(n_tree-1))], [3,0,-1], [0,3,-2] ])
 	b = np.array([1,0,0])
@@ -56,11 +53,10 @@ def create_tree():
 			matrix[i][secondChild-1] = 1.0/6
 			#pi[i] = 3.0/2044
 			pi[i] = pi_values[2]
-	print(pi)
 	return matrix, pi, nodes
 
 
-def create_grid():
+def create_grid(n_grid):
 	# Solves system to calculate stationary distribution:
 	A = np.array([ [4, 4*(n_grid-2), n_grid*n_grid - 4 - 4*(n_grid-2)], [3,-2,0], [0,4,-3] ])
 	b = np.array([1,0,0])
@@ -139,8 +135,15 @@ def total_distance(v1,v2):
 ### QUESTION 3C ###
 ###################
 
-def question3():
-	matrix, pi, nodes = create_grid()
+def question3c():
+	print("(# Iterations, Total Distance)")
+
+	# Graph sizes:
+	n_ring = 1023	# Total nodes will be n_ring
+	n_tree = 10		# Total nodes will be 2**n_tree - 1
+	n_grid = 32		# Total nodes will be n_grid * n_grid
+
+	matrix, pi, nodes = create_grid(n_grid)
 	pi_t = np.zeros((nodes))
 	pi_t[0] = 1
 	for i in range(100001):
@@ -153,4 +156,89 @@ def question3():
 	print("Pi(t): ", pi_t)
 	print("Pi: ", pi)
 
-question3()
+# Uncomment next line to run question3c program:
+#question3c()
+
+##################
+### QUESTION 4 ###
+##################
+
+epsilon = 0.0001
+graphs = [10,50,100,300,700,1000,3000,5000,10000]
+
+def question4_ring():
+	print("(# Nodes, Mixing Time)")
+	# For each requested graph in question text:
+	for i in graphs:
+		# Creates graph:
+		n_ring = i
+		matrix, pi, nodes = create_ring(n_ring)
+		pi_t = np.zeros((nodes))
+		pi_t[0] = 1
+		iterations = 0
+		# Runs markov chain:
+		while True:
+			# Matrix multiplication:
+			mult = pi_t.dot(matrix)
+			pi_t = mult
+			# Increments number of iterations:
+			iterations += 1
+			# Checks if condition was fulfilled:
+			if (total_distance(pi_t, pi) <= epsilon):
+				break
+		print("(", i, ",", iterations, ")")
+
+def question4_tree():
+	print("(# Nodes, Mixing Time)")
+	# For each requested graph in question text:
+	for i in graphs:
+		# Creates graph:
+		n_tree = round(math.log(i)/math.log(2))
+		matrix, pi, nodes = create_tree(n_tree)
+		pi_t = np.zeros((nodes))
+		pi_t[0] = 1
+		iterations = 0
+		# Runs markov chain:
+		while True:
+			# Matrix multiplication:
+			mult = pi_t.dot(matrix)
+			pi_t = mult
+			# Increments number of iterations:
+			iterations += 1
+			# Checks if condition was fulfilled:
+			if (total_distance(pi_t, pi) <= epsilon):
+				break
+		print("(", 2**n_tree-1, ",", iterations, ")")
+
+def question4_grid():
+	print("(# Nodes, Mixing Time)")
+	# For each requested graph in question text:
+	for i in graphs:
+		# Creates graph:
+		n_grid = round(math.sqrt(i))
+		matrix, pi, nodes = create_grid(n_grid)
+		pi_t = np.zeros((nodes))
+		pi_t[0] = 1
+		iterations = 0
+		# Runs markov chain:
+		while True:
+			# Matrix multiplication:
+			mult = pi_t.dot(matrix)
+			pi_t = mult
+			# Increments number of iterations:
+			iterations += 1
+			# Checks if condition was fulfilled:
+			if (total_distance(pi_t, pi) <= epsilon):
+				break
+		print("(", n_grid*n_grid, ",", iterations, ")")
+
+
+####################
+### MAIN PROGRAM ###
+####################
+
+# Uncomment the question you wish to test:
+#question3c()
+#question4_ring()
+#question4_tree()
+question4_grid()
