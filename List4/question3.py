@@ -23,6 +23,11 @@ def create_ring():
 	return matrix, pi, n_ring
 
 def create_tree():
+	# Solves system to calculate stationary distribution:
+	A = np.array([ [2**(n_tree-1), 1, 2**n_tree-2-(2**(n_tree-1))], [3,0,-1], [0,3,-2] ])
+	b = np.array([1,0,0])
+	pi_values = np.linalg.solve(A,b)
+	# Calculates probabilities and assigns stationary distribution values:
 	nodes = (2**n_tree) - 1
 	matrix = np.zeros((nodes,nodes))
 	pi = np.zeros((nodes))
@@ -33,12 +38,14 @@ def create_tree():
 		if i == 0:
 			matrix[i][1] = 0.25
 			matrix[i][2] = 0.25
-			pi[i] = 1.0/1022
+			#pi[i] = 1.0/1022
+			pi[i] = pi_values[1]
 		# Folhas:
 		elif i > (2**(n_tree-1)) - 2:
 			father = math.floor((i+1)/2)
 			matrix[i][father-1] = 0.5
-			pi[i] = 1.0/2044
+			#pi[i] = 1.0/2044
+			pi[i] = pi_values[0]
 		# Vertices intermediarios:
 		else:
 			father = math.floor((i+1)/2)
@@ -47,11 +54,18 @@ def create_tree():
 			matrix[i][father-1] = 1.0/6
 			matrix[i][firstChild-1] = 1.0/6
 			matrix[i][secondChild-1] = 1.0/6
-			pi[i] = 3.0/2044
+			#pi[i] = 3.0/2044
+			pi[i] = pi_values[2]
+	print(pi)
 	return matrix, pi, nodes
 
 
 def create_grid():
+	# Solves system to calculate stationary distribution:
+	A = np.array([ [4, 4*(n_grid-2), n_grid*n_grid - 4 - 4*(n_grid-2)], [3,-2,0], [0,4,-3] ])
+	b = np.array([1,0,0])
+	pi_values = np.linalg.solve(A,b)
+	# Calculates probabilities and assigns stationary distribution values:
 	nodes = n_grid*n_grid
 	matrix = np.zeros((nodes,nodes))
 	pi = np.zeros((nodes))
@@ -62,47 +76,56 @@ def create_grid():
 		if i == 0:
 			matrix[i][1] = 0.25
 			matrix[i][n_grid] = 0.25
-			pi[i] = 1.0/1984
+			#pi[i] = 1.0/1984
+			pi[i] = pi_values[0]
 		elif i == n_grid-1:
 			matrix[i][n_grid-2] = 0.25
 			matrix[i][(2*n_grid)-1] = 0.25
-			pi[i] = 1.0/1984
+			#pi[i] = 1.0/1984
+			pi[i] = pi_values[0]
 		elif i == ((n_grid*n_grid) - n_grid):
 			matrix[i][((n_grid*n_grid) - n_grid)+1] = 0.25
 			matrix[i][((n_grid*n_grid) - 2*n_grid)] = 0.25
-			pi[i] = 1.0/1984
+			#pi[i] = 1.0/1984
+			pi[i] = pi_values[0]
 		elif i == ((n_grid*n_grid) - 1):
 			matrix[i][(n_grid*n_grid) - 2] = 0.25
 			matrix[i][(n_grid*n_grid) - 1 - n_grid] = 0.25
-			pi[i] = 1.0/1984
+			#pi[i] = 1.0/1984
+			pi[i] = pi_values[0]
 		# Casos em que i está nas fileiras das extremidades:
 		elif i > 0 and i < n_grid-1:
 			matrix[i][i-1] = 1.0/6
 			matrix[i][i+1] = 1.0/6
 			matrix[i][i+n_grid] = 1.0/6
-			pi[i] = 3.0/3968
+			#pi[i] = 3.0/3968
+			pi[i] = pi_values[1]
 		elif i > ((n_grid*n_grid) - n_grid) and i < ((n_grid*n_grid) - 1):
 			matrix[i][i-1] = 1.0/6
 			matrix[i][i+1] = 1.0/6
 			matrix[i][i-n_grid] = 1.0/6
-			pi[i] = 3.0/3968
+			#pi[i] = 3.0/3968
+			pi[i] = pi_values[1]
 		elif i % n_grid == 0:
 			matrix[i][i-n_grid] = 1.0/6
 			matrix[i][i+n_grid] = 1.0/6
 			matrix[i][i+1] = 1.0/6
-			pi[i] = 3.0/3968
+			#pi[i] = 3.0/3968
+			pi[i] = pi_values[1]
 		elif (i+1) % n_grid == 0:
 			matrix[i][i-n_grid] = 1.0/6
 			matrix[i][i+n_grid] = 1.0/6
 			matrix[i][i-1] = 1.0/6
-			pi[i] = 3.0/3968
+			#pi[i] = 3.0/3968
+			pi[i] = pi_values[1]
 		# Caso em que i é nó intermediário:
 		else:
 			matrix[i][i-1] = 0.125
 			matrix[i][i+1] = 0.125
 			matrix[i][i-n_grid] = 0.125
 			matrix[i][i+n_grid] = 0.125
-			pi[i] = 1.0/992
+			#pi[i] = 1.0/992
+			pi[i] = pi_values[2]
 	return matrix, pi, nodes
 
 def total_distance(v1,v2):
@@ -112,11 +135,22 @@ def total_distance(v1,v2):
 	return acc*1.0/2
 
 
-matrix, pi, nodes = create_tree()
-pi_t = np.zeros((nodes))
-pi_t[455] = 1
-for i in range(100000):
-	mult = pi_t.dot(matrix)
-	pi_t = mult
-print(total_distance(pi_t, pi))
-print(pi_t)
+###################
+### QUESTION 3C ###
+###################
+
+def question3():
+	matrix, pi, nodes = create_grid()
+	pi_t = np.zeros((nodes))
+	pi_t[0] = 1
+	for i in range(100001):
+		# Prints current total distance:
+		if i in [0,10,100,1000,10000,30000,50000,70000,100000]:
+			print("(", i, ",", total_distance(pi_t, pi), ")")
+		# Matrix multiplication:
+		mult = pi_t.dot(matrix)
+		pi_t = mult
+	print("Pi(t): ", pi_t)
+	print("Pi: ", pi)
+
+question3()
