@@ -9,7 +9,7 @@
 
 // MACROS:
 #define ptos(a) to_string(a.first) + "," + to_string(a.second)
-#define N 10 // SAW is counted by steps, so pathSize = N + 1
+#define N 15 // SAW is counted by steps, so pathSize = N + 1
 
 using namespace std;
 
@@ -85,7 +85,7 @@ int main(){
 
 	int samplesCount = 0;
 	int stepCount = 0;
-	double accumulator = 0;
+	long long int accumulator = 0;
 
 	while(samplesCount < totalSamples){
 		// Clears hash table:
@@ -104,7 +104,7 @@ int main(){
 			// Selects last node in the walk:
 			node endNode = path[pathSize-1];
 			// Adds end-to-end square distance to the MC accumulator:
-			accumulator += endToEndDistance();
+			accumulator += numOfHorseshoes();
 		}
 	}
 
@@ -163,7 +163,7 @@ void enumerateWrapper(){
 	// Start recursion:
 	_enumerate(&resultEnum, numOfHorseshoes);
 	// Print result:
-	cout << resultEnum*1.0/44100 << endl;
+	cout << resultEnum*1.0/6416596 << endl;
 }
 
 // Enumerates all SAWs with N steps, executes function f at each SAW and saves the sum to result:
@@ -179,65 +179,40 @@ void _enumerate(T* result, T (*f)(), int it){
 	} else {
 		// Declares placeholder node:
 		node next;
-		// Go east:
-		next = node(path[it-1].first+1, path[it-1].second);
-		// Checks if collision occurred:
-		if (hashTable.count(ptos(next)) == 0){
-			// Adds to path:
-			path.push_back(next);
-			// Adds to hashtable for collision detection:
-			hashTable.insert(make_pair(ptos(next),true));
-			// Go to next iteration:
-			_enumerate(result, f, it+1);
-			// Removes element from path:
-			path.pop_back();
-			// Removes element from hash table:
-			hashTable.erase(ptos(next));
-		}
-		// Go west:
-		next = node(path[it-1].first-1, path[it-1].second);
-		// Checks if collision occurred:
-		if (hashTable.count(ptos(next)) == 0){
-			// Adds to path:
-			path.push_back(next);
-			// Adds to hashtable for collision detection:
-			hashTable.insert(make_pair(ptos(next),true));
-			// Go to next iteration:
-			_enumerate(result, f, it+1);
-			// Removes element from path:
-			path.pop_back();
-			// Removes element from hash table:
-			hashTable.erase(ptos(next));
-		}
-		// Go north:
-		next = node(path[it-1].first, path[it-1].second+1);
-		// Checks if collision occurred:
-		if (hashTable.count(ptos(next)) == 0){
-			// Adds to path:
-			path.push_back(next);
-			// Adds to hashtable for collision detection:
-			hashTable.insert(make_pair(ptos(next),true));
-			// Go to next iteration:
-			_enumerate(result, f, it+1);
-			// Removes element from path:
-			path.pop_back();
-			// Removes element from hash table:
-			hashTable.erase(ptos(next));
-		}
-		// Go south:
-		next = node(path[it-1].first, path[it-1].second-1);
-		// Checks if collision occurred:
-		if (hashTable.count(ptos(next)) == 0){
-			// Adds to path:
-			path.push_back(next);
-			// Adds to hashtable for collision detection:
-			hashTable.insert(make_pair(ptos(next),true));
-			// Go to next iteration:
-			_enumerate(result, f, it+1);
-			// Removes element from path:
-			path.pop_back();
-			// Removes element from hash table:
-			hashTable.erase(ptos(next));
+		// Tries all combinations:
+		for (int i=0; i< 4; i++){
+			// Selects heading:
+			switch(i){
+				// East:
+				case 0:
+					next = node(path[it-1].first+1, path[it-1].second);
+					break;
+				// West:
+				case 1:
+					next = node(path[it-1].first-1, path[it-1].second);
+					break;
+				// North:
+				case 2:
+					next = node(path[it-1].first, path[it-1].second+1);
+					break;
+				// South:
+				case 3:
+					next = node(path[it-1].first, path[it-1].second-1);
+					break;
+			}
+			// Checks if collision occurred:
+			if (hashTable.count(ptos(next)) == 0){
+				// Adds to path:
+				path.push_back(next);
+				// Adds to hashtable for collision detection:
+				hashTable.insert(make_pair(ptos(next),true));
+				// Go to next iteration:
+				_enumerate(result, f, it+1);
+				// Removes element from path:
+				path.pop_back();
+				// Removes element from hash table:
+				hashTable.erase(ptos(next));
+			}
 		}
 	}
 }
