@@ -9,7 +9,7 @@
 
 // MACROS:
 #define ptos(a) to_string(a.first) + "," + to_string(a.second)
-#define N 10000 // SAW is counted by steps, so pathSize = N + 1
+#define N 10 // SAW is counted by steps, so pathSize = N + 1
 
 using namespace std;
 
@@ -35,9 +35,12 @@ vector<int> sampleTransformation();							// Samples a matrix (represented as ve
 void putInHash(int pivot);									// Puts all nodes of the walk into the hash table up to (and including) the node in position pivot
 bool checkCollision(int pivot, vector<int>* matrix);		// Checks if [pivot+1, n-1] elements, under transfomation matrix, collide with [0, pivot] elements. If not, copies them to the current path
 double endToEndDistance();									// Returns the end to end squared distance of the walk
-int numOfHorseshoes();										// Returns the number of horseshoes contained in the walk
+long long int numOfHorseshoes();							// Returns the number of horseshoes contained in the walk
 void generateRod();											// Generates an initial rod-shaped self-avoiding walk
 void SAWtoFile(string filePath);							// Saves SAW coordinates to file
+template <class T>
+void _enumerate(T* result, T (*f)(), int it=1);				// Enumerates all SAWs with N steps, executes function f at each SAW and saves the sum to result
+void enumerateWrapper();									// Initializes enumeration scenario
 
 // Helper function to print pairs:
 template <typename T, typename S>
@@ -63,6 +66,9 @@ ostream& operator<<(ostream& os, const vector<T>& v)
     return os;
 }
 
+long long int countMe(){
+	return 1;
+}
 
 
 ////////////////////	////////////////////	////////////////////
@@ -115,9 +121,9 @@ int main(){
 /////////////////////////
 
 // Returns the number of horseshoes contained in the walk:
-int numOfHorseshoes(){
+long long int numOfHorseshoes(){
 	// accumulator for number of horseshoes:
-	int horseshoes = 0;
+	long long int horseshoes = 0;
 	// Runs through the walk:
 	for (int i=3; i<pathSize; i++){
 		// Checks all 4 possiblities for a horseshoe to exist.
@@ -144,6 +150,96 @@ int numOfHorseshoes(){
 // Returns the end to end squared distance of the walk:
 double endToEndDistance(){
 	return pow(path[pathSize-1].first,2) + pow(path[pathSize-1].second,2);
+}
+
+// Initializes enumeration scenario:
+void enumerateWrapper(){
+	// Adds point (0,0) to path:
+	path.push_back(node(0,0));
+	// Adds it to hash table:
+	hashTable.insert(make_pair(ptos(path[0]),true));
+	// Variable to hold result:
+	long long int resultEnum = 0;
+	// Start recursion:
+	_enumerate(&resultEnum, numOfHorseshoes);
+	// Print result:
+	cout << resultEnum*1.0/44100 << endl;
+}
+
+// Enumerates all SAWs with N steps, executes function f at each SAW and saves the sum to result:
+template <class T>
+void _enumerate(T* result, T (*f)(), int it){
+	// Checks if end has been reached:
+	if (it == pathSize){
+		// Evaluates f on current SAW:
+		*result += f();
+		// Returns to previous iteration:
+		return;
+	// Tries all possiblities:
+	} else {
+		// Declares placeholder node:
+		node next;
+		// Go east:
+		next = node(path[it-1].first+1, path[it-1].second);
+		// Checks if collision occurred:
+		if (hashTable.count(ptos(next)) == 0){
+			// Adds to path:
+			path.push_back(next);
+			// Adds to hashtable for collision detection:
+			hashTable.insert(make_pair(ptos(next),true));
+			// Go to next iteration:
+			_enumerate(result, f, it+1);
+			// Removes element from path:
+			path.pop_back();
+			// Removes element from hash table:
+			hashTable.erase(ptos(next));
+		}
+		// Go west:
+		next = node(path[it-1].first-1, path[it-1].second);
+		// Checks if collision occurred:
+		if (hashTable.count(ptos(next)) == 0){
+			// Adds to path:
+			path.push_back(next);
+			// Adds to hashtable for collision detection:
+			hashTable.insert(make_pair(ptos(next),true));
+			// Go to next iteration:
+			_enumerate(result, f, it+1);
+			// Removes element from path:
+			path.pop_back();
+			// Removes element from hash table:
+			hashTable.erase(ptos(next));
+		}
+		// Go north:
+		next = node(path[it-1].first, path[it-1].second+1);
+		// Checks if collision occurred:
+		if (hashTable.count(ptos(next)) == 0){
+			// Adds to path:
+			path.push_back(next);
+			// Adds to hashtable for collision detection:
+			hashTable.insert(make_pair(ptos(next),true));
+			// Go to next iteration:
+			_enumerate(result, f, it+1);
+			// Removes element from path:
+			path.pop_back();
+			// Removes element from hash table:
+			hashTable.erase(ptos(next));
+		}
+		// Go south:
+		next = node(path[it-1].first, path[it-1].second-1);
+		// Checks if collision occurred:
+		if (hashTable.count(ptos(next)) == 0){
+			// Adds to path:
+			path.push_back(next);
+			// Adds to hashtable for collision detection:
+			hashTable.insert(make_pair(ptos(next),true));
+			// Go to next iteration:
+			_enumerate(result, f, it+1);
+			// Removes element from path:
+			path.pop_back();
+			// Removes element from hash table:
+			hashTable.erase(ptos(next));
+		}
+	}
 }
 
 
