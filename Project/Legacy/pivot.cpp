@@ -6,7 +6,6 @@
 #include <algorithm>		// To remove elements from vectors by value
 #include <fstream>			// For file operations
 #include <cmath>			// For mathematical operations
-#include <algorithm>		// For using max and min functions
 
 // MACROS:
 #define ptos(a) to_string(a.first) + "," + to_string(a.second)
@@ -33,8 +32,8 @@ uniform_int_distribution<int> uPivot, uTransformation;		// Uniform integer distr
 void initGenerator();										// Initiailzes the RNG
 int samplePivot();											// Returns an int from 0 to pathSize-1
 vector<int> sampleTransformation();							// Samples a matrix (represented as vector) with the transformation to be applied
-bool checkCollision(int pivot1, int pivot2, vector<int>* matrix1, vector<int>* matrix2);	// Checks if transformation forms a SAW. If so, copies them to the current path
-node transformNode(int i, int pivot, vector<int>* matrix, node* newCoord);	// Applies *matrix* to the node at position *i* using *pivot* as origin, and returns the resulting node
+void putInHash(int pivot);									// Puts all nodes of the walk into the hash table up to (and including) the node in position pivot
+bool checkCollision(int pivot, vector<int>* matrix);		// Checks if [pivot+1, n-1] elements, under transfomation matrix, collide with [0, pivot] elements. If not, copies them to the current path
 double endToEndDistance();									// Returns the end to end squared distance of the walk
 long long int numOfHorseshoes();							// Returns the number of horseshoes contained in the walk
 void generateRod();											// Generates an initial rod-shaped self-avoiding walk
@@ -92,25 +91,22 @@ int main(){
 	while(samplesCount < totalSamples){
 		// Clears hash table:
 		hashTable.clear();
-		// Chooses pivots:
-		int pivot1 = samplePivot();
-		int pivot2 = samplePivot();
+		// Chooses a pivot:
+		int pivot = samplePivot();
+		// Puts all elements before (and including) the pivot into the hash table:
+		putInHash(pivot);
 		// Samples a 2D transformation:
-		vector<int> matrix1 = sampleTransformation();
-		vector<int> matrix2 = sampleTransformation();
-		// Checks if transformation, when applied to the paths delimited by the pivots, forms a SAW:
-		bool collision = checkCollision(pivot1, pivot2, &matrix1, &matrix2);
-		//SAWtoFile("string.txt");
-		//string dummy;
-		//getline(cin, dummy);
+		vector<int> matrix = sampleTransformation();
+		// Checks if transformation, when applied to the [k+1,n-1] path elements, collides with [0,k]:
+		bool collision = checkCollision(pivot, &matrix);
 		// Increments number of samples:
 		samplesCount++;
 		if (samplesCount > thermalization){
 			// Selects last node in the walk:
 			node endNode = path[pathSize-1];
-			// Counts collision:
+			// Counts collisions:
 			if (collision) collisionsCount++;
-			// Adds evaluating function to the MC accumulator:
+			// Adds end-to-end square distance to the MC accumulator:
 			accumulator += endToEndDistance();
 		}
 	}
@@ -157,7 +153,7 @@ long long int numOfHorseshoes(){
 
 // Returns the end to end squared distance of the walk:
 double endToEndDistance(){
-	return pow(path[pathSize-1].first-path[0].first,2) + pow(path[pathSize-1].second-path[0].second,2);
+	return pow(path[pathSize-1].first,2) + pow(path[pathSize-1].second,2);
 }
 
 // Initializes enumeration scenario:
@@ -226,96 +222,51 @@ void _enumerate(T* result, T (*f)(), int it){
 }
 
 
-// Checks if transformation forms a SAW. If so, copies them to the current path:
-bool checkCollision(int pivot1, int pivot2, vector<int>* matrix1, vector<int>* matrix2){
-	// Sorts the pivots:
-	int maxPivot = max(pivot1, pivot2);
-	int minPivot = min(pivot1, pivot2);
-	//cout << "Pivots: ( " << maxPivot << ", " << minPivot << ")" << endl;
-	// Puts everyone in between (and including) pivots into the hashtable:
-	for (int i=minPivot; i<=maxPivot; i++){
-		// Inserts node into hash table:
-		hashTable.insert(make_pair(ptos(path[i]),true));
-	}
-	/////////////////////////
-	/// HANDLES MAX PIVOT ///
-	/////////////////////////
-	// Placeholder vector to hold new [maxPivot+1, n-1] coordinates:
-	vector<node> placeholderMax;
+// Checks if [pivot+1, n-1] elements, under transfomation matrix, collide with [0, pivot] elements. If not, copies them to the current path:
+bool checkCollision(int pivot, vector<int>* matrix){
+	// Placeholder vector to hold new [pivot+1, n-1] coordinates:
+	vector<node> placeholder;
 	// Fills placeholder vector with newly calculated coordinates while checking for collisions:
-	for (int i=maxPivot+1; i<pathSize; i++){
-		// Calculates the new coordinate using the matrix transformation and pivot as origin:
-		node newCoord;
-		transformNode(i, maxPivot, matrix1, &newCoord);
+	for (int i=pivot+1; i<pathSize; i++){
+		node newCoord(0,0);
+		// Subtracts pivot from coordinate (takes pivot as origin):
+		newCoord.first = path[i].first - path[pivot].first;
+		newCoord.second = path[i].second - path[pivot].second;
+		// Applies transformation:
+		int a = (newCoord.first * matrix->at(0)) + (newCoord.second * matrix->at(2));
+		int b = (newCoord.first * matrix->at(1)) + (newCoord.second * matrix->at(3));
+		newCoord.first = a;
+		newCoord.second = b;
+		// Adds pivot back to coordinate (restores position):
+		newCoord.first = newCoord.first + path[pivot].first;
+		newCoord.second = newCoord.second + path[pivot].second;
 		// If it hasn't collided:
 		if (hashTable.count(ptos(newCoord)) == 0){
 			// Adds to the placeholder vector:
-			placeholderMax.push_back(newCoord);
-			// Adds to the hashtable:
-			hashTable.insert(make_pair(ptos(newCoord),true));
+			placeholder.push_back(newCoord);
 		// If it has collided:
 		} else {
 			// Ends function and returns true (collision detected):
-			//cout << "Collided on max pivot" << endl;
 			return true;
 		}
 	}
-	/////////////////////////
-	/// HANDLES MIN PIVOT ///
-	/////////////////////////
-	// Placeholder vector to hold new [maxPivot+1, n-1] coordinates:
-	vector<node> placeholderMin;
-	// Fills placeholder vector with newly calculated coordinates while checking for collisions:
-	for (int i=0; i<minPivot; i++){
-		// Calculates the new coordinate using the matrix transformation and pivot as origin:
-		node newCoord;
-		transformNode(i, minPivot, matrix2, &newCoord);
-		// If it hasn't collided:
-		if (hashTable.count(ptos(newCoord)) == 0){
-			// Adds to the placeholder vector:
-			placeholderMin.push_back(newCoord);
-			// Adds to the hashtable:
-			hashTable.insert(make_pair(ptos(newCoord),true));
-		// If it has collided:
-		} else {
-			// Ends function and returns true (collision detected):
-			//cout << "Collided on min pivot" << endl;
-			return true;
-		}
-	}
-
-	// If no collisions were detected, copies placeholder vectors to their corresponding locations in the SAW:
-	// MAX PIVOT
-	for (int i=maxPivot+1; i<pathSize; i++){
+	// If no collisions were detected, copies placeholder vector to [pivot+1, n-1] elements of path:
+	for (int i=pivot+1; i<pathSize; i++){
 		// Copies first element of placeholder to pivot+1 element of path:
-		path[i] = placeholderMax[i-maxPivot-1];
-	}
-	// MIN PIVOT
-	for (int i=0; i<minPivot; i++){
-		// Copies first element of placeholder to pivot+1 element of path:
-		path[i] = placeholderMin[i];
+		path[i] = placeholder[i-pivot-1];
 	}
 	// Returns false (no collision detected):
-	//cout << "Didnt collide" << endl;
 	return false;
 }
 
-// Applies *matrix* to the node at position *i* using *pivot* as origin, and returns the resulting node:
-node transformNode(int i, int pivot, vector<int>* matrix, node* newCoord){
-	// Subtracts pivot from coordinate (takes pivot as origin):
-	newCoord->first = path[i].first - path[pivot].first;
-	newCoord->second = path[i].second - path[pivot].second;
-	// Applies transformation:
-	int a = (newCoord->first * matrix->at(0)) + (newCoord->second * matrix->at(2));
-	int b = (newCoord->first * matrix->at(1)) + (newCoord->second * matrix->at(3));
-	newCoord->first = a;
-	newCoord->second = b;
-	// Adds pivot back to coordinate (restores position):
-	newCoord->first = newCoord->first + path[pivot].first;
-	newCoord->second = newCoord->second + path[pivot].second;
-	//cout << "Transformed to " << *newCoord << endl;
+// Puts all nodes of the walk into the hash table up to (and including) the node in position pivot:
+void putInHash(int pivot){
+	// Runs through the current SAW:
+	for (int i=0; i<=pivot; i++){
+		// Inserts node into hash table:
+		hashTable.insert(make_pair(ptos(path[i]),true));
+	}
 }
-
 
 
 // Generates an initial rod-shaped self-avoiding walk:
