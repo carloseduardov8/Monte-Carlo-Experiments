@@ -10,7 +10,7 @@
 // MACROS:
 #define ptos(a) to_string(a.first) + "," + to_string(a.second)
 #define N 15 // SAW is counted by steps, so pathSize = N + 1
-#define K 1 // Number of local changes before the pivot modification is applied
+#define K 0 // Number of local changes before the pivot modification is applied
 
 using namespace std;
 
@@ -23,8 +23,8 @@ typedef pair<int,int> node;									// Renames coordinate pair for convenience
 // GLOBAL VARIABLES
 bool verbose = false;										// True if program should print what it is doing
 int pathSize = N + 1;										// Size (in nodes) of path to generate. SAWs are usually counted by steps (N)
-int totalSamples = 1010000;									// Total number of samples to collect (excluding thermalization)
-int thermalization = 10000;									// Number of samples to discard before collecting statistics
+int totalSamples = 10100000;									// Total number of samples to collect (excluding thermalization)
+int thermalization = 100000;									// Number of samples to discard before collecting statistics
 unordered_map<string,bool> hashTable; 						// Grid structure global variable
 vector<node> path;											// Path being formed
 mt19937 pivotGen, transformationGen, local4gen, local3gen;						// Mersenne Twister generators
@@ -41,6 +41,7 @@ double endToEndDistance();									// Returns the end to end squared distance of
 long long int numOfHorseshoes();							// Returns the number of horseshoes contained in the walk
 void generateRod();											// Generates an initial rod-shaped self-avoiding walk
 void SAWtoFile(string filePath);							// Saves SAW coordinates to file
+void printSAW();							       // Prints SAW to stdout
 template <class T>
 void _enumerate(T* result, T (*f)(), int it=1);				// Enumerates all SAWs with N steps, executes function f at each SAW and saves the sum to result
 void enumerateWrapper();									// Initializes enumeration scenario
@@ -92,6 +93,8 @@ int main(){
 	int collisionsCount = 0;
 
 	while(samplesCount < totalSamples){
+    // Report progress...
+    if (samplesCount % (totalSamples/10) == 0) cout << 100*samplesCount/totalSamples << "% done" << endl;
 		// Clears hash table:
 		hashTable.clear();
 		// Chooses a pivot:
@@ -227,7 +230,7 @@ void _enumerate(T* result, T (*f)(), int it){
 
 // Checks if [pivot+1, n-1] elements, under transfomation matrix, collide with [0, pivot] elements. If not, copies them to the current path:
 bool checkCollision(int pivot, vector<int>* matrix){
-	cout << pivot << endl;
+	if (verbose) cout << "Pivot: " << pivot << endl;
 	// Placeholder vector to hold new [pivot+1, n-1] coordinates:
 	vector<node> placeholder;
 
@@ -235,18 +238,24 @@ bool checkCollision(int pivot, vector<int>* matrix){
 	/// LOCAL CHANGES ///
 	/////////////////////
 
+  // Sets the placeholder pivot as the current pivot. It's important to separate these two because, as local transformations happen,
+  // path[pivot+i], which is static, will start to differ from the actual new position of these nodes
+  node phPivot = path[pivot];
+  node phPivotPrev = path[pivot-1];
 	// For each local change to be made:
-	for (int i=0; i<K; i++){
+	for (int i=0; i<K ; i++){
 		// Vector of possibilities (N,S,E,W if available):
 		vector<node> possibilities;
 		// Case where pivot is the origin:
 		if (pivot == 0){
-			possibilities.push_back(make_pair(path[pivot].first, path[pivot].second+1));
-			possibilities.push_back(make_pair(path[pivot].first, path[pivot].second-1));
-			possibilities.push_back(make_pair(path[pivot].first-1, path[pivot].second));
-			possibilities.push_back(make_pair(path[pivot].first+1, path[pivot].second));
+			possibilities.push_back(make_pair(phPivot.first, phPivot.second+1));
+			possibilities.push_back(make_pair(phPivot.first, phPivot.second-1));
+			possibilities.push_back(make_pair(phPivot.first-1, phPivot.second));
+			possibilities.push_back(make_pair(phPivot.first+1, phPivot.second));
 			// Chooses from the possibilities vector:
 			int chosen = sample4local();
+      if (verbose) cout << "ORIGIN! will choose " << chosen << endl;
+			if (verbose) cout << possibilities << endl;
 			node newCoord = possibilities[chosen];
 			// If it hasn't collided:
 			if (hashTable.count(ptos(newCoord)) == 0){
@@ -254,36 +263,38 @@ bool checkCollision(int pivot, vector<int>* matrix){
 				placeholder.push_back(newCoord);
 				// Adds to the hash table:
 				hashTable.insert(make_pair(ptos(newCoord),true));
+        // "Increments" pivot for next iteration:
+    		phPivot = newCoord;
 			// If it has collided:
 			} else {
 				// Ends function and returns true (collision detected):
+        if (verbose) cout << "COLLIDED on 4local" << endl;
 				return true;
 			}
 		// Case where pivot is not the origin and next node exists. Otherwise, don't do anything:
 		} else if (pivot+1 < pathSize){
 			// Checks all 4 possibilities as to where the next possible nodes are, adding them to a vector:
-			if ((path[pivot-1].first == path[pivot].first) && (path[pivot-1].second + 1 == path[pivot].second)){
-				possibilities.push_back(make_pair(path[pivot].first, path[pivot].second+1));
-				possibilities.push_back(make_pair(path[pivot].first-1, path[pivot].second));
-				possibilities.push_back(make_pair(path[pivot].first+1, path[pivot].second));
-			} else if ((path[pivot-1].first == path[pivot].first) && (path[pivot-1].second - 1 == path[pivot].second)){
-				possibilities.push_back(make_pair(path[pivot].first, path[pivot].second-1));
-				possibilities.push_back(make_pair(path[pivot].first-1, path[pivot].second));
-				possibilities.push_back(make_pair(path[pivot].first+1, path[pivot].second));
-			} else  if ((path[pivot-1].first + 1 == path[pivot].first) && (path[pivot-1].second == path[pivot].second)){
-				possibilities.push_back(make_pair(path[pivot].first, path[pivot].second+1));
-				possibilities.push_back(make_pair(path[pivot].first, path[pivot].second-1));
-				possibilities.push_back(make_pair(path[pivot].first+1, path[pivot].second));
-			} else  if ((path[pivot-1].first - 1 == path[pivot].first) && (path[pivot-1].second == path[pivot].second)){
-				possibilities.push_back(make_pair(path[pivot].first, path[pivot].second+1));
-				possibilities.push_back(make_pair(path[pivot].first, path[pivot].second-1));
-				possibilities.push_back(make_pair(path[pivot].first-11, path[pivot].second));
+			if ((phPivotPrev.first == phPivot.first) && (phPivotPrev.second + 1 == phPivot.second)){
+				possibilities.push_back(make_pair(phPivot.first, phPivot.second+1));
+				possibilities.push_back(make_pair(phPivot.first-1, phPivot.second));
+				possibilities.push_back(make_pair(phPivot.first+1, phPivot.second));
+			} else if ((phPivotPrev.first == phPivot.first) && (phPivotPrev.second - 1 == phPivot.second)){
+				possibilities.push_back(make_pair(phPivot.first, phPivot.second-1));
+				possibilities.push_back(make_pair(phPivot.first-1, phPivot.second));
+				possibilities.push_back(make_pair(phPivot.first+1, phPivot.second));
+			} else  if ((phPivotPrev.first + 1 == phPivot.first) && (phPivotPrev.second == phPivot.second)){
+				possibilities.push_back(make_pair(phPivot.first, phPivot.second+1));
+				possibilities.push_back(make_pair(phPivot.first, phPivot.second-1));
+				possibilities.push_back(make_pair(phPivot.first+1, phPivot.second));
+			} else  if ((phPivotPrev.first - 1 == phPivot.first) && (phPivotPrev.second == phPivot.second)){
+				possibilities.push_back(make_pair(phPivot.first, phPivot.second+1));
+				possibilities.push_back(make_pair(phPivot.first, phPivot.second-1));
+				possibilities.push_back(make_pair(phPivot.first-1, phPivot.second));
 			}
 			// Chooses from the possibilities vector:
 			int chosen = sample3local();
-			cout << "will choose " << chosen << endl;
-			cout << possibilities << endl;
-			SAWtoFile("saw.txt");
+			if (verbose) cout << "will choose " << chosen << endl;
+			if (verbose) cout << possibilities << endl;
 			node newCoord = possibilities[chosen];
 			// If it hasn't collided:
 			if (hashTable.count(ptos(newCoord)) == 0){
@@ -291,34 +302,40 @@ bool checkCollision(int pivot, vector<int>* matrix){
 				placeholder.push_back(newCoord);
 				// Adds to the hash table:
 				hashTable.insert(make_pair(ptos(newCoord),true));
+        // "Increments" pivot for next iteration:
+        phPivotPrev = phPivot;
+    		phPivot = newCoord;
 			// If it has collided:
 			} else {
 				// Ends function and returns true (collision detected):
+        if (verbose) cout << "COLLIDED on 3local" << endl;
 				return true;
 			}
 		}
-		// Increments pivot for next iteration:
-		pivot++;
 	}
 
 	////////////////////////
 	/// MATRIX TRANSFORM ///
 	////////////////////////
 
+  if (verbose) cout << "Transforming around " << phPivot <<endl;
+  // Fixes the first point of transformation:
+  node firstPoint = path[pivot+K];
 	// Fills placeholder vector with newly calculated coordinates while checking for collisions:
-	for (int i=pivot+1; i<pathSize; i++){
+	for (int i=pivot+K+1; i<pathSize; i++){
 		node newCoord(0,0);
 		// Subtracts pivot from coordinate (takes pivot as origin):
-		newCoord.first = path[i].first - path[pivot].first;
-		newCoord.second = path[i].second - path[pivot].second;
+		newCoord.first = path[i].first - firstPoint.first;
+		newCoord.second = path[i].second - firstPoint.second;
 		// Applies transformation:
 		int a = (newCoord.first * matrix->at(0)) + (newCoord.second * matrix->at(2));
 		int b = (newCoord.first * matrix->at(1)) + (newCoord.second * matrix->at(3));
 		newCoord.first = a;
 		newCoord.second = b;
 		// Adds pivot back to coordinate (restores position):
-		newCoord.first = newCoord.first + path[pivot].first;
-		newCoord.second = newCoord.second + path[pivot].second;
+		newCoord.first = newCoord.first + phPivot.first;
+		newCoord.second = newCoord.second + phPivot.second;
+    if (verbose) cout << "Transformed " << path[i] << " into " << newCoord <<endl;
 		// If it hasn't collided:
 		if (hashTable.count(ptos(newCoord)) == 0){
 			// Adds to the placeholder vector:
@@ -326,17 +343,19 @@ bool checkCollision(int pivot, vector<int>* matrix){
 		// If it has collided:
 		} else {
 			// Ends function and returns true (collision detected):
+      if (verbose) cout << "COLLIDED on matrix" << endl;
 			return true;
 		}
 	}
 	// If no collisions were detected, copies placeholder vector to [pivot+1, n-1] elements of path:
 	int k = 0;
-	for (int i=pivot+1-K; i<pathSize; i++){
+	for (int i=pivot+1; i<pathSize; i++){
 		// Copies first element of placeholder to pivot+1 element of path:
 		path[i] = placeholder[k];
 		k++;
 	}
 	// Returns false (no collision detected):
+  if (verbose) cout << "Didn't collide" << endl;
 	return false;
 }
 
@@ -372,6 +391,17 @@ void SAWtoFile(string filePath){
 	}
 }
 
+// Prints SAW to stdout:
+void printSAW(){
+  cout << "SAW: ";
+  // Loops through SAW coordinates and prints them:
+	for (int i=0; i<path.size(); i++){
+		cout << path[i];
+    if (i != path.size()-1) cout << " -- ";
+	}
+  cout << endl;
+}
+
 // Initiailzes the RNG:
 void initGenerator(){
 	// Obtain a seed from the system clock:
@@ -402,7 +432,7 @@ int sample4local(){
 
 // Returns an int from 0 to pathSize-1:
 int sample3local(){
-	return u4Local(local3gen);
+	return u3Local(local3gen);
 }
 
 // Samples a matrix (represented as vector) with the transformation to be applied:
