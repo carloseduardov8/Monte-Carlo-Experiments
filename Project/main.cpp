@@ -9,8 +9,9 @@
 
 // MACROS:
 #define ptos(a) to_string(a.first) + "," + to_string(a.second)
-#define N 15 // SAW is counted by steps, so pathSize = N + 1
+#define N 1500 // SAW is counted by steps, so pathSize = N + 1
 #define K 0 // Number of local changes before the pivot modification is applied
+#define TRANSFORM_INTERVAL 1 // Number of iterations before a sampled matrix is applied
 
 using namespace std;
 
@@ -23,8 +24,8 @@ typedef pair<int,int> node;									// Renames coordinate pair for convenience
 // GLOBAL VARIABLES
 bool verbose = false;										// True if program should print what it is doing
 int pathSize = N + 1;										// Size (in nodes) of path to generate. SAWs are usually counted by steps (N)
-int totalSamples = 10100000;									// Total number of samples to collect (excluding thermalization)
-int thermalization = 100000;									// Number of samples to discard before collecting statistics
+int totalSamples = 1010000;									// Total number of samples to collect (excluding thermalization)
+int thermalization = 10000;									// Number of samples to discard before collecting statistics
 unordered_map<string,bool> hashTable; 						// Grid structure global variable
 vector<node> path;											// Path being formed
 mt19937 pivotGen, transformationGen, local4gen, local3gen;						// Mersenne Twister generators
@@ -34,7 +35,7 @@ void initGenerator();										// Initiailzes the RNG
 int samplePivot();											// Returns an int from 0 to pathSize-1
 int sample3local();											// Sample local transforms for non-origin nodes;
 int sample4local();											// Samples local transforms for origin;
-vector<int> sampleTransformation();							// Samples a matrix (represented as vector) with the transformation to be applied
+vector<int> sampleTransformation(int iter);							// Samples a matrix (represented as vector) with the transformation to be applied
 void putInHash(int pivot);									// Puts all nodes of the walk into the hash table up to (and including) the node in position pivot
 bool checkCollision(int pivot, vector<int>* matrix);		// Checks if [pivot+1, n-1] elements, under transfomation matrix, collide with [0, pivot] elements. If not, copies them to the current path
 double endToEndDistance();									// Returns the end to end squared distance of the walk
@@ -102,7 +103,7 @@ int main(){
 		// Puts all elements before (and including) the pivot into the hash table:
 		putInHash(pivot);
 		// Samples a 2D transformation:
-		vector<int> matrix = sampleTransformation();
+		vector<int> matrix = sampleTransformation(samplesCount);
 		// Checks if transformation, when applied to the [k+1,n-1] path elements, collides with [0,k]:
 		bool collision = checkCollision(pivot, &matrix);
 		// Increments number of samples:
@@ -436,48 +437,54 @@ int sample3local(){
 }
 
 // Samples a matrix (represented as vector) with the transformation to be applied:
-vector<int> sampleTransformation(){
+vector<int> sampleTransformation(int iter){
 	vector<int> matrix(4);
-	// Samples from the distribution:
-	int sample = uTransformation(transformationGen);
-	// Checks which transform corresponds to int sample:
-	switch(sample){
-		// +90 rotation:
-		case 0:
-			matrix[0] = 0;  matrix[1] = -1;
-			matrix[2] = 1;  matrix[3] = 0;
-			break;
-		// -90 rotation:
-		case 1:
-			matrix[0] = 0;  matrix[1] = 1;
-			matrix[2] = -1; matrix[3] = 0;
-			break;
-		// 180 rotation:
-		case 2:
-			matrix[0] = -1; matrix[1] = 0;
-			matrix[2] = 0;  matrix[3] = -1;
-			break;
-		// X-axis reflection:
-		case 3:
-			matrix[0] = 1;  matrix[1] = 0;
-			matrix[2] = 0; 	matrix[3] = -1;
-			break;
-		// Y-axis reflection:
-		case 4:
-			matrix[0] = -1; matrix[1] = 0;
-			matrix[2] = 0; 	matrix[3] = 1;
-			break;
-		// y=x reflection:
-		case 5:
-			matrix[0] = 0;  matrix[1] = 1;
-			matrix[2] = 1;  matrix[3] = 0;
-			break;
-		// y=-x reflection:
-		case 6:
-			matrix[0] = 0;  matrix[1] = -1;
-			matrix[2] = -1; matrix[3] = 0;
-			break;
-	}
+  // Checks if this iteration corresponds to a sampled matrix or to an identity matrix:
+  if ((iter % TRANSFORM_INTERVAL) != 0){
+    matrix[0] = 1;  matrix[1] = 0;
+    matrix[2] = 0;  matrix[3] = 1;
+  } else {
+    // Samples from the distribution:
+  	int sample = uTransformation(transformationGen);
+  	// Checks which transform corresponds to int sample:
+  	switch(sample){
+  		// +90 rotation:
+  		case 0:
+  			matrix[0] = 0;  matrix[1] = -1;
+  			matrix[2] = 1;  matrix[3] = 0;
+  			break;
+  		// -90 rotation:
+  		case 1:
+  			matrix[0] = 0;  matrix[1] = 1;
+  			matrix[2] = -1; matrix[3] = 0;
+  			break;
+  		// 180 rotation:
+  		case 2:
+  			matrix[0] = -1; matrix[1] = 0;
+  			matrix[2] = 0;  matrix[3] = -1;
+  			break;
+  		// X-axis reflection:
+  		case 3:
+  			matrix[0] = 1;  matrix[1] = 0;
+  			matrix[2] = 0; 	matrix[3] = -1;
+  			break;
+  		// Y-axis reflection:
+  		case 4:
+  			matrix[0] = -1; matrix[1] = 0;
+  			matrix[2] = 0; 	matrix[3] = 1;
+  			break;
+  		// y=x reflection:
+  		case 5:
+  			matrix[0] = 0;  matrix[1] = 1;
+  			matrix[2] = 1;  matrix[3] = 0;
+  			break;
+  		// y=-x reflection:
+  		case 6:
+  			matrix[0] = 0;  matrix[1] = -1;
+  			matrix[2] = -1; matrix[3] = 0;
+  			break;
+  	}
+  }
 	// Returns the sampled matrix:
 	return matrix;
 
